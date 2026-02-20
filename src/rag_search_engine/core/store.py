@@ -19,7 +19,7 @@ class Storage:
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-        self.conn = sqlite3_ext.connect(self.db_path)
+        self.conn = sqlite3_ext.connect(self.db_path, check_same_thread=False)
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
         self.conn.enable_load_extension(False)
@@ -67,10 +67,24 @@ class Storage:
             )
             doc_id = cur.lastrowid
 
+            # Fallback if lastrowid is not available (some drivers/versions)
+            if doc_id is None or doc_id == 0:
+                doc_id = self.conn.execute(
+                    "SELECT id FROM documents WHERE path = ?", (path,)
+                ).fetchone()[0]
+
+            print(
+                f"DEBUG: add_document path={path}, doc_id={doc_id}, chunks={len(chunks_with_embeddings)}"
+            )
+
             # 2. Clear old chunks if updating
             old_chunks = self.conn.execute(
                 "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
             ).fetchall()
+            if old_chunks:
+                print(
+                    f"DEBUG: Clearing {len(old_chunks)} old chunks for doc_id={doc_id}"
+                )
             for (chunk_id,) in old_chunks:
                 self.conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
             self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -86,6 +100,12 @@ class Storage:
                     "INSERT INTO vec_chunks (rowid, embedding) VALUES (?, ?)",
                     (chunk_id, serialize_float32(embedding)),
                 )
+
+            # Verify insertion before exiting the 'with self.conn' block
+            check_count = self.conn.execute(
+                "SELECT count(*) FROM chunks WHERE doc_id = ?", (doc_id,)
+            ).fetchone()[0]
+            print(f"DEBUG: Inserted {check_count} chunks for doc_id={doc_id}")
 
     def search(
         self, query_vector: List[float], limit: int = 5

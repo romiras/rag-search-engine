@@ -15,7 +15,7 @@ except AttributeError:
     print("Error: SQLite extension loading is not supported in this environment.")
     exit(1)
 
-vec_version, = db.execute("select vec_version()").fetchone()
+(vec_version,) = db.execute("select vec_version()").fetchone()
 print(f"vec_version={vec_version}")
 
 # 1. Create a virtual table for vector search
@@ -57,5 +57,5 @@ for rowid, distance in rows:
     print(f"ID: {rowid}, Distance: {distance:.4f}")
 
 # 4. Check vector length of a single embedding
-result = db.execute('select vec_length(?)', [serialize_float32(query_embedding)])
+result = db.execute("select vec_length(?)", [serialize_float32(query_embedding)])
 print(f"\nVector length check: {result.fetchone()[0]}")

@@ -1,0 +1,15 @@
+<div id="sync-container" 
+     {% if progress_percent < 100 %} hx-get="/sync/status" hx-trigger="every 1s" hx-swap="outerHTML" {% endif %}>
+    <h3>Indexing {{ "in Progress..." if progress_percent < 100 else "Complete!" }}</h3>
+    <div class="progress-container">
+        <div class="progress-bar">
+            <div class="progress-inner" style="width: {{ progress_percent }}%;"></div>
+        </div>
+        <p class="sync-info">Processed {{ current }} of {{ total }} files ({{ progress_percent }}%)</p>
+    </div>
+    {% if progress_percent == 100 %}
+        <button class="btn btn-sync" hx-post="/sync" hx-target="#sync-container" hx-swap="outerHTML">
+            Restart Full Index Sync
+        </button>
+    {% endif %}
+</div>

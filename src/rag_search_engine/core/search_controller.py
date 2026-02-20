@@ -4,6 +4,7 @@ from .embedder import Embedder
 from .store import Storage
 from .chunker import MarkdownChunker
 
+
 class SearchController:
     def __init__(self, embedder: Embedder, storage: Storage, threshold: float = 0.6):
         self.embedder = embedder
@@ -13,14 +14,14 @@ class SearchController:
     def search(self, query: str, limit: int = 5) -> List[Tuple[str, str, float]]:
         """Returns List of (path, content, score) filtered by threshold"""
         query_vector = self.embedder.embed(query)[0]
-        
+
         # sqlite-vec distance for cosine is (1 - cosine_similarity)
         # score = 1.0 - distance
-        
+
         # Get raw results from storage
         # We fetch more than limit to allow for threshold filtering
         raw_results = self.storage.search(query_vector.tolist(), limit=limit * 3)
-        
+
         filtered_results = []
         for path, content, distance in raw_results:
             # sqlite-vec distance for normalized vectors is L2 distance.
@@ -29,27 +30,50 @@ class SearchController:
             # print(f"DEBUG: score={score:.4f}, distance={distance:.4f}, content={content[:30]}...")
             if score >= self.threshold:
                 filtered_results.append((path, content, score))
-        
+
         return filtered_results[:limit]
 
     def index_file(self, path: str, content: str, chunker: MarkdownChunker):
         """Indexes a single file: chunk -> embed -> store"""
         content_hash = hashlib.md5(content.encode()).hexdigest()
-        
+
         # Check if already indexed with same hash (optional optimization)
         # For now, we'll just re-index
-        
+
         chunks = chunker.chunk(content)
+        print(f"DEBUG: Chunker produced {len(chunks)} chunks for {path}")
         if not chunks:
             return
-            
+
         embeddings = self.embedder.embed(chunks)
-        
+        print(f"DEBUG: Embedder produced {embeddings.shape} embeddings")
+
         chunks_with_embeddings = []
         for i, chunk_text in enumerate(chunks):
             chunks_with_embeddings.append((chunk_text, embeddings[i].tolist()))
-            
+
         self.storage.add_document(path, content_hash, chunks_with_embeddings)
+
+    def index_directory(
+        self, root_dir: str, chunker: MarkdownChunker, on_progress=None
+    ):
+        """Indexes all markdown files in a directory recursively"""
+        from pathlib import Path
+
+        files = list(Path(root_dir).rglob("*.md"))
+        total = len(files)
+
+        for i, file_path in enumerate(files):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self.index_file(str(file_path), content, chunker)
+            except Exception as e:
+                print(f"Error indexing {file_path}: {e}")
+
+            if on_progress:
+                on_progress(i + 1, total)
+
 
 if __name__ == "__main__":
     # POC Test
@@ -58,12 +82,12 @@ if __name__ == "__main__":
     DB_FILE = "data/search_test.db"
     if os.path.exists(DB_FILE):
         os.remove(DB_FILE)
-    
+
     embedder = Embedder()
     store = Storage(DB_FILE)
     chunker = MarkdownChunker()
     controller = SearchController(embedder, store, threshold=0.4)
-    
+
     # Index some real-looking data
     doc_content = """
 # Python Programming
@@ -73,12 +97,12 @@ Python is a great language for AI.
 To bake a cake, you need flour, eggs, and sugar.
     """
     controller.index_file("tutorial.md", doc_content, chunker)
-    
+
     print("--- Search: 'Python AI' ---")
     results = controller.search("Python AI")
     for p, c, s in results:
         print(f"[{s:.2f}] {p}: {c[:50]}...")
-        
+
     print("\n--- Search: 'How to bake' ---")
     results = controller.search("How to bake")
     for p, c, s in results:
@@ -88,7 +112,7 @@ To bake a cake, you need flour, eggs, and sugar.
     results = controller.search("Baking bread")
     for p, c, s in results:
         print(f"[{s:.2f}] {p}: {c[:50]}...")
-        
+
     print("\n--- Search: 'Space exploration' (should be empty) ---")
     results = controller.search("Space exploration")
     if not results:
