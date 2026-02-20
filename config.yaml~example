@@ -1,0 +1,16 @@
+# RAG Search Engine Configuration
+
+search:
+  threshold: 0.6
+  model_name: "all-MiniLM-L6-v2"
+
+storage:
+  db_path: "data/local_index.db"
+
+logging:
+  log_path: "logs/search.log"
+  level: "INFO"
+
+indexing:
+  batch_size: 32
+  include_paths: [] # Absolute paths to index
