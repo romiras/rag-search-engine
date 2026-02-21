@@ -44,6 +44,9 @@ async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+from fastapi.responses import HTMLResponse, PlainTextResponse
+import os
+
 @app.post("/search", response_class=HTMLResponse)
 async def search(request: Request, query: str = Form(None)):
     if not query:
@@ -56,6 +59,17 @@ async def search(request: Request, query: str = Form(None)):
         "search_results.html",
         {"request": request, "results": normalize_scores(results)},
     )
+
+
+@app.get("/api/document", response_class=PlainTextResponse)
+async def get_document(path: str):
+    try:
+        if not os.path.exists(path):
+            return PlainTextResponse("File not found.", status_code=404)
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return PlainTextResponse(f"Error reading document: {e}", status_code=500)
 
 
 def background_sync():
