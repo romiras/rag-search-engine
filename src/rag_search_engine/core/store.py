@@ -53,6 +53,15 @@ class Storage:
                 )
             """)
 
+            # FTS5 table for keyword search
+            self.conn.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+                    chunk_id UNINDEXED,
+                    content,
+                    tokenize = 'porter'
+                )
+            """)
+
     def add_document(
         self,
         path: str,
@@ -85,6 +94,15 @@ class Storage:
                 print(
                     f"DEBUG: Clearing {len(old_chunks)} old chunks for doc_id={doc_id}"
                 )
+                old_chunk_ids = [c[0] for c in old_chunks]
+                # Use json_each for safe parameter passing of a list
+                self.conn.execute(
+                    "DELETE FROM document_chunks_fts WHERE chunk_id IN (SELECT value FROM json_each(?))",
+                    (
+                        "[" + ",".join(map(str, old_chunk_ids)) + "]",
+                    ),  # Pass IDs as a JSON array string
+                )
+
             for (chunk_id,) in old_chunks:
                 self.conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
             self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -100,6 +118,11 @@ class Storage:
                     "INSERT INTO vec_chunks (rowid, embedding) VALUES (?, ?)",
                     (chunk_id, serialize_float32(embedding)),
                 )
+                # Also insert into FTS table
+                self.conn.execute(
+                    "INSERT INTO document_chunks_fts (chunk_id, content) VALUES (?, ?)",
+                    (chunk_id, content),
+                )
 
             # Verify insertion before exiting the 'with self.conn' block
             check_count = self.conn.execute(
@@ -107,7 +130,44 @@ class Storage:
             ).fetchone()[0]
             print(f"DEBUG: Inserted {check_count} chunks for doc_id={doc_id}")
 
-    def search(
+    @staticmethod
+    def _sanitize_fts_query(query: str) -> str:
+        """
+        Wraps each whitespace-separated token in double quotes so FTS5
+        treats them as literal strings, not as operators (-, AND, OR, NOT, etc.).
+        Empty or blank queries return an empty string.
+        """
+        tokens = query.split()
+        if not tokens:
+            return ""
+        return " ".join(f'"{token}"' for token in tokens)
+
+    def search_fts(self, query: str, limit: int = 5) -> List[Tuple[str, str, float]]:
+        """
+        Performs a full-text search.
+        Returns List of (path, content, rank)
+        """
+        fts_query = self._sanitize_fts_query(query)
+        if not fts_query:
+            return []
+        results = self.conn.execute(
+            """
+            SELECT
+                d.path,
+                c.content,
+                ft.rank
+            FROM document_chunks_fts ft
+            JOIN chunks c ON ft.chunk_id = c.id
+            JOIN documents d ON c.doc_id = d.id
+            WHERE ft.content MATCH ?
+            ORDER BY rank
+            LIMIT ?
+            """,
+            (fts_query, limit),
+        ).fetchall()
+        return results
+
+    def search_vector(
         self, query_vector: List[float], limit: int = 5
     ) -> List[Tuple[str, str, float]]:
         """Returns List of (path, content, distance)"""

@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from rag_search_engine.core.embedder import Embedder
 from rag_search_engine.core.store import Storage
 from rag_search_engine.core.chunker import MarkdownChunker
-from rag_search_engine.core.search_controller import SearchController
+from rag_search_engine.core.search_controller import SearchController, normalize_scores
 from rag_search_engine.web.core.config import get_settings
 
 # Global singletons
@@ -53,7 +53,8 @@ async def search(request: Request, query: str = Form(None)):
 
     results = controller.search(query, limit=10)
     return templates.TemplateResponse(
-        "search_results.html", {"request": request, "results": results}
+        "search_results.html",
+        {"request": request, "results": normalize_scores(results)},
     )
 
 

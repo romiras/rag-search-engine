@@ -11,12 +11,24 @@ A local-first RAG (Retrieval-Augmented Generation) engine designed to index Mark
 
 ## Quick Start
 
-1. Install dependencies:
+### Using Makefile (Recommended)
+1. **Setup:** `make install && make setup`
+2. **Run Server:** `make run`
+3. **Test:** `make test`
+
+### Manual Setup
+1. **Install dependencies:**
    ```bash
    uv install
    ```
-2. Configure search paths in `config.yaml`.
-3. Start the server:
+2. **Setup configuration:**
+   Copy the example configuration and add your Markdown directories to `indexing.include_paths`:
    ```bash
-   uv run python src/rag_search_engine/main.py
+   cp config.yaml~example config.yaml
    ```
+3. **Start the server:**
+   ```bash
+   PYTHONPATH=src uv run python -m rag_search_engine.web.main
+   ```
+4. **Index your files:**
+   Open [http://127.0.0.1:8000](http://127.0.0.1:8000) and click the **Sync** button.

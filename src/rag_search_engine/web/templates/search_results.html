@@ -1,14 +1,13 @@
 <div id="search-results">
-    {% if results %}
-        <p>Found {{ results|length }} results:</p>
-        {% for path, content, score in results %}
-        <div class="result-item">
-            <span class="result-score">Similarity: {{ "%.2f"|format(score) }}</span>
-            <div class="result-path">{{ path }}</div>
-            <div class="result-content">{{ content }}</div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <p>No results found matching your threshold.</p>
-    {% endif %}
+  {% if results %}
+  <p>Found {{ results|length }} results:</p>
+  {% for path, content, score in results %}
+  <div class="result-item">
+    <span class="result-score">Relevance: {{ "%.0f"|format(score) }}%</span>
+    <div class="result-path">{{ path }}</div>
+    <div class="result-content">{{ content }}</div>
+  </div>
+  {% endfor %} {% else %}
+  <p>No results found matching your threshold.</p>
+  {% endif %}
 </div>
