@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 # Ensure src is in PYTHONPATH
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from rag_search_engine.core.embedder import Embedder
 from rag_search_engine.core.store import Storage

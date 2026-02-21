@@ -23,10 +23,10 @@ run:
 	PYTHONPATH=src uv run python -m rag_search_engine.web.main
 
 lint:
-	uv run ruff check src/ --fix
+	uv run ruff check src/ scripts/ tests/ --fix
 
 format:
-	uv run ruff format src/
+	uv run ruff format src/ scripts/ tests/
 
 test:
 	PYTHONPATH=src uv run pytest tests/

@@ -7,12 +7,23 @@ Run these after any change to the core logic.
 
 | Test Level | Command | What it Verifies |
 | :--- | :--- | :--- |
-| **Chunking** | `PYTHONPATH=src uv run python test_chunker.py` | Markdown AST parsing, breadcrumb generation, and token-aware truncation. |
-| **Storage** | `PYTHONPATH=src uv run python test_storage.py` | `sqlite-vec` extension loading, schema creation, and multi-thread safe writes. |
-| **Controller** | `PYTHONPATH=src uv run python test_controller.py` | The "Embed -> Store -> Search" pipeline and similarity threshold filtering. |
-| **Linting** | `uv run ruff check src/ --fix` | Adherence to PEP 8 and project-specific code quality standards. |
+| **Chunking** | `PYTHONPATH=src uv run python tests/manual/test_chunker.py` | Markdown AST parsing, breadcrumb generation, and token-aware truncation. |
+| **Storage** | `PYTHONPATH=src uv run python tests/manual/test_storage.py` | `sqlite-vec` extension loading, schema creation, and multi-thread safe writes. |
+| **Controller** | `PYTHONPATH=src uv run python tests/manual/test_controller.py` | The "Embed -> Store -> Search" pipeline and similarity threshold filtering. |
+| **Linting** | `uv run ruff check src/ scripts/ tests/ --fix` | Adherence to PEP 8 and project-specific code quality standards. |
 
-## 2. Automated Smoke Test (End-to-End)
+## 2. Utility Scripts (Introspection & Debugging)
+These scripts in the `scripts/` directory help with deep-dive analysis of the engine's behavior.
+
+| Script | Command | Purpose |
+| :--- | :--- | :--- |
+| **Reindex** | `PYTHONPATH=src uv run python scripts/reindex.py` | Triggers a manual full reindex of the configured paths. |
+| **Similarity** | `PYTHONPATH=src uv run python scripts/check_similarity.py` | Compares two strings and outputs their vector similarity score. |
+| **AST Tool** | `PYTHONPATH=src uv run python scripts/print_ast.py` | Visualizes how `mistune` parses a specific Markdown file. |
+| **Debug Search** | `PYTHONPATH=src uv run python scripts/debug_search.py` | Runs a CLI search with verbose logging of RRF scores and thresholds. |
+| **Hypothesis** | `PYTHONPATH=src uv run python scripts/prove_threshold_hypothesis.py` | Runs batch tests to validate the optimal similarity threshold. |
+
+## 3. Automated Smoke Test (End-to-End)
 Run this to verify the web layer and API response format.
 
 ```bash

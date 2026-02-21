@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 # Ensure src is in PYTHONPATH
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from rag_search_engine.core.chunker import MarkdownChunker
 from rag_search_engine.core.embedder import Embedder
