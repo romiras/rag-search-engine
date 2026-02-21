@@ -92,8 +92,11 @@ class SearchController:
         """Indexes a single file: chunk -> embed -> store"""
         content_hash = hashlib.md5(content.encode()).hexdigest()
 
-        # Check if already indexed with same hash (optional optimization)
-        # For now, we'll just re-index
+        # Check if already indexed with same hash
+        existing_hash = self.storage.get_document_hash(path)
+        if existing_hash == content_hash:
+            print(f"DEBUG: Skipping {path} (hash match)")
+            return
 
         chunks = chunker.chunk(content)
         print(f"DEBUG: Chunker produced {len(chunks)} chunks for {path}")

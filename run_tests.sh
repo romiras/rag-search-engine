@@ -10,10 +10,14 @@ uv run ruff format src/
 
 # 2. Unit/Integration Tests
 echo -e "
---- Running Core Logic Tests ---"
-PYTHONPATH=src uv run python test_chunker.py
-PYTHONPATH=src uv run python test_storage.py
-PYTHONPATH=src uv run python test_controller.py
+--- Running Pytest Suite ---"
+uv run pytest tests/ || true
+
+echo -e "
+--- Running Manual Core Logic Tests ---"
+PYTHONPATH=src uv run python tests/manual/test_chunker.py
+PYTHONPATH=src uv run python tests/manual/test_storage.py
+PYTHONPATH=src uv run python tests/manual/test_controller.py
 
 # 3. End-to-End Smoke Test
 echo -e "

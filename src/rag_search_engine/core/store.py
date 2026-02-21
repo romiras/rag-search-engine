@@ -25,6 +25,8 @@ class Storage:
         self.conn.enable_load_extension(False)
 
         with self.conn:
+            self.conn.execute("PRAGMA foreign_keys = ON;")
+
             # Metadata table
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
@@ -62,6 +64,22 @@ class Storage:
                 )
             """)
 
+            # Triggers to clean up virtual tables ON DELETE CASCADE from chunks table
+            self.conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks
+                BEGIN
+                    DELETE FROM vec_chunks WHERE rowid = old.id;
+                    DELETE FROM document_chunks_fts WHERE chunk_id = old.id;
+                END;
+            """)
+
+    def get_document_hash(self, path: str) -> str | None:
+        """Returns the stored content hash for a document, or None if not found."""
+        row = self.conn.execute(
+            "SELECT content_hash FROM documents WHERE path = ?", (path,)
+        ).fetchone()
+        return row[0] if row else None
+
     def add_document(
         self,
         path: str,
@@ -70,42 +88,35 @@ class Storage:
     ):
         with self.conn:
             # 1. Insert or update document
-            cur = self.conn.execute(
-                "INSERT OR REPLACE INTO documents (path, content_hash) VALUES (?, ?)",
-                (path, content_hash),
-            )
-            doc_id = cur.lastrowid
+            row = self.conn.execute(
+                "SELECT id FROM documents WHERE path = ?", (path,)
+            ).fetchone()
 
-            # Fallback if lastrowid is not available (some drivers/versions)
-            if doc_id is None or doc_id == 0:
-                doc_id = self.conn.execute(
-                    "SELECT id FROM documents WHERE path = ?", (path,)
-                ).fetchone()[0]
+            if row:
+                doc_id = row[0]
+                self.conn.execute(
+                    "UPDATE documents SET content_hash = ?, indexed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (content_hash, doc_id),
+                )
+
+                # 2. Clear old chunks. Virtual tables will be cleaned up by chunks_ad trigger.
+                self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+            else:
+                cur = self.conn.execute(
+                    "INSERT INTO documents (path, content_hash) VALUES (?, ?)",
+                    (path, content_hash),
+                )
+                doc_id = cur.lastrowid
+
+                # Fallback if lastrowid is not available (some drivers/versions)
+                if doc_id is None or doc_id == 0:
+                    doc_id = self.conn.execute(
+                        "SELECT id FROM documents WHERE path = ?", (path,)
+                    ).fetchone()[0]
 
             print(
                 f"DEBUG: add_document path={path}, doc_id={doc_id}, chunks={len(chunks_with_embeddings)}"
             )
-
-            # 2. Clear old chunks if updating
-            old_chunks = self.conn.execute(
-                "SELECT id FROM chunks WHERE doc_id = ?", (doc_id,)
-            ).fetchall()
-            if old_chunks:
-                print(
-                    f"DEBUG: Clearing {len(old_chunks)} old chunks for doc_id={doc_id}"
-                )
-                old_chunk_ids = [c[0] for c in old_chunks]
-                # Use json_each for safe parameter passing of a list
-                self.conn.execute(
-                    "DELETE FROM document_chunks_fts WHERE chunk_id IN (SELECT value FROM json_each(?))",
-                    (
-                        "[" + ",".join(map(str, old_chunk_ids)) + "]",
-                    ),  # Pass IDs as a JSON array string
-                )
-
-            for (chunk_id,) in old_chunks:
-                self.conn.execute("DELETE FROM vec_chunks WHERE rowid = ?", (chunk_id,))
-            self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
 
             # 3. Insert new chunks and vectors
             for content, embedding in chunks_with_embeddings:
@@ -200,6 +211,9 @@ class Storage:
             (serialize_float32(query_vector), limit),
         ).fetchall()
         return results
+
+    # Alias for backward compatibility in internal tests
+    search = search_vector
 
 
 if __name__ == "__main__":

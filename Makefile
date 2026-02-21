@@ -29,7 +29,7 @@ format:
 	uv run ruff format src/
 
 test:
-	./run_tests.sh
+	PYTHONPATH=src uv run pytest tests/
 
 clean:
 	rm -rf .ruff_cache
