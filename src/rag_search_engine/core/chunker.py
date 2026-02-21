@@ -53,15 +53,15 @@ class MarkdownChunker:
         return chunks
 
     def _get_text_from_children(self, children: List[Dict[str, Any]]) -> str:
-        text = ""
+        parts = []
         for child in children:
             if "text" in child:
-                text += child["text"]
+                parts.append(child["text"])
             elif "raw" in child:
-                text += child["raw"]
+                parts.append(child["raw"])
             elif "children" in child:
-                text += self._get_text_from_children(child["children"])
-        return text
+                parts.append(self._get_text_from_children(child["children"]))
+        return " ".join(p for p in parts if p)
 
     def _get_token_content(self, token: Dict[str, Any]) -> str:
         if token["type"] == "block_code":

@@ -133,14 +133,28 @@ class Storage:
     @staticmethod
     def _sanitize_fts_query(query: str) -> str:
         """
-        Wraps each whitespace-separated token in double quotes so FTS5
-        treats them as literal strings, not as operators (-, AND, OR, NOT, etc.).
-        Empty or blank queries return an empty string.
+        Sanitizes a user query for safe use with FTS5 MATCH.
+
+        Strategy:
+        - Tokens that are plain words (letters/digits only) are passed through
+          *unquoted* so the Porter stemmer can match variants (plot → plots).
+        - Tokens containing FTS5 operator characters (-, +, ^, *, (, ), ", AND,
+          OR, NOT) are double-quoted so they are treated as literals, not syntax.
+        - Completely empty input returns "".
         """
-        tokens = query.split()
-        if not tokens:
-            return ""
-        return " ".join(f'"{token}"' for token in tokens)
+        import re
+
+        FTS5_SPECIAL = re.compile(r'[+^*()"<>]|-')
+        FTS5_KEYWORDS = {"AND", "OR", "NOT"}
+        safe_tokens = []
+        for raw in query.split():
+            if FTS5_SPECIAL.search(raw) or raw.upper() in FTS5_KEYWORDS:
+                # Escape any embedded double-quotes then wrap
+                escaped = raw.replace('"', '""')
+                safe_tokens.append(f'"{escaped}"')
+            else:
+                safe_tokens.append(raw)
+        return " ".join(safe_tokens)
 
     def search_fts(self, query: str, limit: int = 5) -> List[Tuple[str, str, float]]:
         """
