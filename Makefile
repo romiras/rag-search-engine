@@ -1,4 +1,4 @@
-.PHONY: install setup run lint format test clean help
+.PHONY: install setup run lint format test stats clean help
 
 # Default target
 help:
@@ -11,6 +11,7 @@ help:
 	@echo "  make lint     - Run Ruff linter and fix issues"
 	@echo "  make format   - Format code using Ruff"
 	@echo "  make test     - Run the full test suite (run_tests.sh)"
+	@echo "  make stats    - Show database statistics"
 	@echo "  make clean    - Remove temporary files and caches"
 
 install:
@@ -30,6 +31,9 @@ format:
 
 test:
 	PYTHONPATH=src uv run pytest tests/
+
+stats:
+	PYTHONPATH=src uv run python scripts/db_stats.py
 
 clean:
 	rm -rf .ruff_cache
