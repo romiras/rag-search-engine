@@ -12,8 +12,8 @@ from rag_search_engine.core.store import Storage
 from rag_search_engine.core.search_controller import SearchController, normalize_scores
 from rag_search_engine.web.core.config import get_settings
 
-TEST_DOCS_DIR = Path(__file__).parent / "data" / "test_docs"
-PROJECT_ROOT = Path(__file__).parent
+TEST_DOCS_DIR = Path(__file__).parent.parent / "data" / "test_docs"
+PROJECT_ROOT = Path(__file__).parent.parent
 THRESHOLD = 0.4
 
 

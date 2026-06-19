@@ -1,8 +1,9 @@
+import os
 from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
 from rag_search_engine.core.embedder import Embedder
@@ -43,9 +44,6 @@ templates = Jinja2Templates(directory=str(base_path / "templates"))
 async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-
-from fastapi.responses import HTMLResponse, PlainTextResponse
-import os
 
 @app.post("/search", response_class=HTMLResponse)
 async def search(request: Request, query: str = Form(None)):

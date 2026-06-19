@@ -9,9 +9,8 @@ uv run ruff check src/ --fix
 uv run ruff format src/
 
 # 2. Unit/Integration Tests
-echo -e "
---- Running Pytest Suite ---"
-uv run pytest tests/ || true
+echo -e "\n--- Running Pytest Suite ---"
+PYTHONPATH=src uv run pytest tests/ || true
 
 echo -e "
 --- Running Manual Core Logic Tests ---"
@@ -32,7 +31,7 @@ SERVER_PID=$!
 
 # Wait for server to boot
 echo "Waiting for server to start..."
-sleep 8
+sleep 15
 
 # Check if server is still running
 if ! kill -0 $SERVER_PID 2>/dev/null; then
