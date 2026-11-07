@@ -1,0 +1,43 @@
+src/rag_search_engine/web/templates/overview_panel.html
+  s_4a9d18694b98b8::t_062b926743802f 1-317
+src/rag_search_engine/web/templates/index.html
+  s_4a9d18694b98b8::t_53864b58241d40 36-423
+  s_4a9d18694b98b8::t_1717805e010774 860-861
+  s_4a9d18694b98b8::t_d8873ca098bfa1 622-678,681-685,703-849
+  s_4a9d18694b98b8::t_8c9f174a59c182 850
+tests/test_overview.py
+  s_4a9d18694b98b8::t_eee61359461615 122-123,138,141
+  s_4a9d18694b98b8::t_093b0d12d16a40 1-121,124-137,139-140,142-222
+src/rag_search_engine/web/main.py
+  s_4a9d18694b98b8::t_9526de571411a1 6,13-16,22,25-32
+  s_4a9d18694b98b8::t_eee61359461615 34
+  s_4a9d18694b98b8::t_d58c180fa18787 148,160
+  s_4a9d18694b98b8::t_3518da889c0281 117-126,130-147,149-159
+  s_4a9d18694b98b8::t_4fb319c8262f3c 33
+  s_4a9d18694b98b8::t_bb0237295d98eb 161-162
+src/rag_search_engine/core/overview.py
+  s_4a9d18694b98b8::t_e9632bb19ee1d3 1-34,38-143,147-169,174-223,227-257,259-389,393-456,460-653
+  s_4a9d18694b98b8::t_b87582a47cd088 654-763,767-807,814-823
+  s_4a9d18694b98b8::t_eee61359461615 35-37,144-146,170-173,224-226,258,390-392,457-459,764-766,808-813
+src/rag_search_engine/core/store.py
+  s_4a9d18694b98b8::t_6d59503595a14d 77-88
+  s_4a9d18694b98b8::t_6b0d76e0269cc6 1,6
+  s_4a9d18694b98b8::t_eee61359461615 302-304
+  s_4a9d18694b98b8::t_d58a13fa69f95a 231-301,305-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9240858afcf9285de519fa4cd4a58d1e28913c7",
+  "prompts": {},
+  "sessions": {
+    "s_4a9d18694b98b8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "db4e7fb5-6133-488f-835b-adfd1f940f61",
+        "model": "gemini-4-argon"
+      },
+      "human_author": "Romiras <298544+romiras@users.noreply.github.com>"
+    }
+  }
+}
