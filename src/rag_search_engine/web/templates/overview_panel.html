@@ -1,0 +1,317 @@
+<div class="overview-dashboard">
+  <!-- Summary Stats Bar -->
+  <div class="overview-stats-bar">
+    <div class="stat-group">
+      <div class="stat-item">
+        <span class="stat-value">{{ overview.stats.documents }}</span>
+        <span class="stat-label">Documents</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">{{ overview.stats.chunks }}</span>
+        <span class="stat-label">Chunks</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">{{ topics|length }}</span>
+        <span class="stat-label">Topic Clusters (k={{ overview.clustering.k }})</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">{{ overview.roots|length }}</span>
+        <span class="stat-label">Roots</span>
+      </div>
+    </div>
+    <div class="overview-meta-actions">
+      <span class="overview-meta-text" title="Model: {{ overview.model_name }}">
+        Built: {{ overview.built_at }}
+      </span>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        hx-post="/overview/rebuild"
+        hx-target="#overview-container"
+        hx-swap="innerHTML"
+      >
+        Rebuild Overview
+      </button>
+    </div>
+  </div>
+
+  {% if overview.stats.documents == 0 %}
+  <div class="overview-panel-card">
+    <p style="color: var(--text-dim); margin: 0;">
+      No indexed documents found. Run <strong>Start Full Index Sync</strong> in the Search tab to populate the index.
+    </p>
+  </div>
+  {% else %}
+
+  <!-- 1. Roots Treemap Panel -->
+  <div class="overview-panel-card">
+    <div class="panel-header">
+      <h3>Roots Distribution</h3>
+      <span class="panel-subtitle">Click a root tile or pill to filter documents</span>
+    </div>
+
+    {% if root_rects %}
+    <div class="svg-treemap-wrapper">
+      <svg
+        class="treemap-svg"
+        viewBox="0 0 800 160"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Root distribution treemap"
+      >
+        {% for r in root_rects %}
+        <g
+          class="treemap-node"
+          data-filter-type="root"
+          data-filter-id="{{ r.id }}"
+          data-filter-label="Root: {{ r.label }}"
+          onclick="applyOverviewFilter('root', this.getAttribute('data-filter-id'), this.getAttribute('data-filter-label'), this)"
+        >
+          <clipPath id="root-clip-{{ loop.index }}">
+            <rect x="{{ r.x + 4 }}" y="{{ r.y + 4 }}" width="{{ [0, r.w - 8]|max }}" height="{{ [0, r.h - 8]|max }}" rx="4" />
+          </clipPath>
+          <rect
+            class="treemap-rect"
+            x="{{ r.x }}"
+            y="{{ r.y }}"
+            width="{{ r.w }}"
+            height="{{ r.h }}"
+            rx="6"
+            fill="{{ r.color }}"
+            fill-opacity="0.2"
+            stroke="{{ r.color }}"
+            stroke-width="1.5"
+          >
+            <title>{{ r.label }} ({{ r.path_prefix }}): {{ r.document_count }} documents ({{ r.share_percent }}%), {{ r.chunk_count }} chunks</title>
+          </rect>
+          <g clip-path="url(#root-clip-{{ loop.index }})">
+            <text x="{{ r.x + 12 }}" y="{{ r.y + 26 }}" class="treemap-title" fill="#f0f6fc">
+              {{ r.label }}
+            </text>
+            <text x="{{ r.x + 12 }}" y="{{ r.y + 48 }}" class="treemap-sub" fill="#c9d1d9">
+              {{ r.document_count }} docs ({{ r.share_percent }}%)
+            </text>
+            <text x="{{ r.x + 12 }}" y="{{ r.y + 68 }}" class="treemap-sub-dim" fill="#8b949e">
+              {{ r.chunk_count }} chunks
+            </text>
+          </g>
+        </g>
+        {% endfor %}
+      </svg>
+    </div>
+
+    <div class="root-pills-row">
+      {% for r in root_rects %}
+      <button
+        type="button"
+        class="root-pill"
+        data-filter-type="root"
+        data-filter-id="{{ r.id }}"
+        data-filter-label="Root: {{ r.label }}"
+        onclick="applyOverviewFilter('root', this.getAttribute('data-filter-id'), this.getAttribute('data-filter-label'), this)"
+        title="{{ r.path_prefix }}"
+      >
+        <span class="color-dot" style="background: {{ r.color }};"></span>
+        <strong>{{ r.label }}</strong>
+        <span class="pill-meta">{{ r.document_count }} docs · {{ r.chunk_count }} chunks</span>
+      </button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 2. Topic Clusters Panel (SVG Cluster Map + Cards) -->
+  <div class="overview-panel-card">
+    <div class="panel-header">
+      <h3>Topic Clusters</h3>
+      <span class="panel-subtitle">Cosine k-means over document vectors · Click any cluster to inspect member files</span>
+    </div>
+
+    {% if topic_rects %}
+    <div class="svg-treemap-wrapper" style="margin-bottom: 16px;">
+      <svg
+        class="treemap-svg"
+        viewBox="0 0 800 180"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Topic clusters treemap"
+      >
+        {% for t in topic_rects %}
+        <g
+          class="treemap-node"
+          data-filter-type="topic"
+          data-filter-id="{{ t.id }}"
+          data-filter-label="Topic {{ t.id }}: {{ t.label }}"
+          onclick="applyOverviewFilter('topic', this.getAttribute('data-filter-id'), this.getAttribute('data-filter-label'), this)"
+        >
+          <clipPath id="topic-clip-{{ loop.index }}">
+            <rect x="{{ t.x + 4 }}" y="{{ t.y + 4 }}" width="{{ [0, t.w - 8]|max }}" height="{{ [0, t.h - 8]|max }}" rx="4" />
+          </clipPath>
+          <rect
+            class="treemap-rect"
+            x="{{ t.x }}"
+            y="{{ t.y }}"
+            width="{{ t.w }}"
+            height="{{ t.h }}"
+            rx="6"
+            fill="{{ t.color }}"
+            fill-opacity="0.18"
+            stroke="{{ t.color }}"
+            stroke-width="1.5"
+          >
+            <title>[{{ t.id }}] {{ t.label }} — {{ t.document_count }} docs ({{ t.share_percent }}%), {{ t.chunk_count }} chunks</title>
+          </rect>
+          <g clip-path="url(#topic-clip-{{ loop.index }})">
+            <text x="{{ t.x + 10 }}" y="{{ t.y + 22 }}" class="treemap-title" fill="#f0f6fc">
+              [{{ t.id }}] {{ t.label }}
+            </text>
+            <text x="{{ t.x + 10 }}" y="{{ t.y + 42 }}" class="treemap-sub" fill="#c9d1d9">
+              {{ t.document_count }} docs ({{ t.share_percent }}%)
+            </text>
+          </g>
+        </g>
+        {% endfor %}
+      </svg>
+    </div>
+    {% endif %}
+
+    <div class="topic-cards-grid">
+      {% for t in topics %}
+      <div
+        class="topic-card"
+        data-filter-type="topic"
+        data-filter-id="{{ t.id }}"
+        data-filter-label="Topic {{ t.id }}: {{ t.label }}"
+        onclick="applyOverviewFilter('topic', this.getAttribute('data-filter-id'), this.getAttribute('data-filter-label'), this)"
+      >
+        <div class="topic-card-header">
+          <span class="topic-id-badge" style="border-color: {{ t.color }}; color: {{ t.color }};">
+            {{ t.id }}
+          </span>
+          <span class="topic-card-title">{{ t.label }}</span>
+          <span class="topic-card-count">{{ t.document_count }} docs</span>
+        </div>
+        <div class="topic-bar-track">
+          <div
+            class="topic-bar-fill"
+            style="width: {{ t.bar_percent }}%; background: {{ t.color }};"
+          ></div>
+        </div>
+        <div class="topic-card-meta">
+          <span>{{ t.chunk_count }} chunks ({{ t.share_percent }}% of corpus)</span>
+        </div>
+        {% if t.label_headings %}
+        <div class="topic-headings-list">
+          {% for lh in t.label_headings %}
+          <span class="subheading-chip">{{ lh }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 3. Heading Cloud Panel -->
+  <div class="overview-panel-card">
+    <div class="panel-header">
+      <h3>Heading Cloud (Top {{ headings|length }} H1/H2)</h3>
+      <span class="panel-subtitle">Sized by chunk frequency across breadcrumbs · Click to filter matching documents</span>
+    </div>
+
+    {% if headings %}
+    <div class="heading-cloud">
+      {% for h in headings %}
+      <button
+        type="button"
+        class="heading-tag level-{{ h.level }}"
+        style="font-size: {{ h.font_size_rem }}rem;"
+        data-filter-type="heading"
+        data-heading-text="{{ h.text }}"
+        data-doc-ids="{{ h.document_ids | join(',') }}"
+        data-filter-label="Heading (H{{ h.level }}): {{ h.text }}"
+        onclick="applyOverviewHeadingFilter(this)"
+        title="H{{ h.level }} · {{ h.chunk_count }} chunks across {{ h.doc_count }} documents"
+      >
+        <span class="heading-text">{{ h.text }}</span>
+        <span class="heading-count">{{ h.chunk_count }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-dim); margin: 0;">No H1/H2 headings found in chunk breadcrumbs.</p>
+    {% endif %}
+  </div>
+
+  <!-- 4. Drill-in Document List Panel -->
+  <div class="overview-panel-card" id="overview-drill-panel">
+    <div class="drill-header">
+      <div class="drill-title-row">
+        <h3>Documents</h3>
+        <span id="overview-active-filter" class="active-filter-badge">
+          All Documents
+        </span>
+        <span id="overview-visible-count" class="drill-count-badge">
+          {{ documents|length }} / {{ documents|length }}
+        </span>
+        <button
+          type="button"
+          id="overview-clear-filter"
+          class="btn btn-secondary btn-xs"
+          style="display: none;"
+          onclick="clearOverviewFilter()"
+        >
+          Reset Filter
+        </button>
+      </div>
+      <div class="drill-search-row">
+        <input
+          type="text"
+          id="overview-doc-filter-input"
+          placeholder="Filter visible documents by title, path, or heading..."
+          oninput="filterOverviewDocRows()"
+        />
+      </div>
+    </div>
+
+    <div id="overview-doc-list" class="overview-doc-list">
+      {% for doc in documents %}
+      <div
+        class="overview-doc-item"
+        data-doc-id="{{ doc.id }}"
+        data-root-id="{{ doc.root_id }}"
+        data-topic-id="{{ doc.topic_id or '' }}"
+        data-path="{{ doc.path }}"
+        data-search-text="{{ (doc.title ~ ' ' ~ doc.path ~ ' ' ~ (doc.top_headings | join(' '))) | lower }}"
+        onclick="loadDocument(this.getAttribute('data-path'))"
+      >
+        <div class="doc-item-top">
+          <span class="doc-item-title">{{ doc.title }}</span>
+          <div class="doc-item-badges">
+            <span class="doc-root-badge">{{ doc.root_label }}</span>
+            {% if doc.topic_id %}
+            <span
+              class="doc-topic-badge"
+              style="border-color: {{ doc.topic_color }}; color: {{ doc.topic_color }};"
+            >
+              {{ doc.topic_id }} · {{ doc.topic_label }}
+            </span>
+            {% else %}
+            <span class="doc-topic-badge">unclustered</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="result-path doc-item-path">{{ doc.path }}</div>
+        {% if doc.top_headings %}
+        <div class="doc-top-headings">
+          {% for th in doc.top_headings %}
+          <span class="doc-heading-chip">{{ th }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>

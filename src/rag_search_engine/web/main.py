@@ -3,19 +3,34 @@ from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks, Form
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
 from rag_search_engine.core.embedder import Embedder
 from rag_search_engine.core.store import Storage
 from rag_search_engine.core.chunker import MarkdownChunker
 from rag_search_engine.core.search_controller import SearchController, normalize_scores
+from rag_search_engine.core.overview import (
+    build_overview_view_context,
+    ensure_overview,
+)
 from rag_search_engine.web.core.config import get_settings
 
 # Global singletons
 controller: Optional[SearchController] = None
 chunker: Optional[MarkdownChunker] = None
+storage_singleton: Optional[Storage] = None
 settings = get_settings()
+
+
+def _get_storage() -> Storage:
+    global storage_singleton
+    if controller is not None and controller.storage is not None:
+        return controller.storage
+    if storage_singleton is None:
+        storage_singleton = Storage(db_path=settings.storage.db_path)
+    return storage_singleton
+
 
 # Progress state
 sync_progress = {"current": 0, "total": 0, "status": "idle"}
@@ -87,10 +102,6 @@ def background_sync():
     total = len(all_files)
     sync_progress["total"] = total
 
-    if total == 0:
-        sync_progress["status"] = "idle"
-        return
-
     # 2. Index files one by one to keep progress accurate across multiple paths
     for i, file_path in enumerate(all_files):
         try:
@@ -103,7 +114,50 @@ def background_sync():
 
         sync_progress["current"] = i + 1
 
+    # 3. Rebuild overview if corpus fingerprint changed (failure must not fail sync)
+    try:
+        ensure_overview(
+            storage=_get_storage(),
+            include_paths=settings.indexing.include_paths,
+            model_name=settings.search.model_name,
+        )
+    except Exception as e:
+        print(f"Error building overview after sync: {e}")
+
     sync_progress["status"] = "idle"
+
+
+@app.get("/api/overview", response_class=JSONResponse)
+async def get_overview_api():
+    payload = ensure_overview(
+        storage=_get_storage(),
+        include_paths=settings.indexing.include_paths,
+        model_name=settings.search.model_name,
+    )
+    return JSONResponse(content=payload)
+
+
+@app.get("/overview", response_class=HTMLResponse)
+async def get_overview_panel(request: Request):
+    payload = ensure_overview(
+        storage=_get_storage(),
+        include_paths=settings.indexing.include_paths,
+        model_name=settings.search.model_name,
+    )
+    ctx = build_overview_view_context(payload)
+    return templates.TemplateResponse(request, "overview_panel.html", ctx)
+
+
+@app.post("/overview/rebuild", response_class=HTMLResponse)
+async def rebuild_overview_panel(request: Request):
+    payload = ensure_overview(
+        storage=_get_storage(),
+        include_paths=settings.indexing.include_paths,
+        model_name=settings.search.model_name,
+        force=True,
+    )
+    ctx = build_overview_view_context(payload)
+    return templates.TemplateResponse(request, "overview_panel.html", ctx)
 
 
 @app.post("/sync", response_class=HTMLResponse)

@@ -1,8 +1,9 @@
+import json
 import sqlite3
 import sqlite_vec
 from sqlite_vec import serialize_float32
 import os
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import pysqlite3 as sqlite3_ext
@@ -71,6 +72,18 @@ class Storage:
                     DELETE FROM vec_chunks WHERE rowid = old.id;
                     DELETE FROM document_chunks_fts WHERE chunk_id = old.id;
                 END;
+            """)
+
+            # Persisted corpus overview table (single row id = 1)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS overview (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    schema_version INTEGER NOT NULL,
+                    model_name TEXT NOT NULL,
+                    built_at TEXT NOT NULL,
+                    source_fingerprint TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                )
             """)
 
     def get_document_hash(self, path: str) -> str | None:
@@ -214,6 +227,97 @@ class Storage:
 
     # Alias for backward compatibility in internal tests
     search = search_vector
+
+    def get_corpus_fingerprint_rows(self) -> List[Tuple[int, str, str, int]]:
+        """Returns (doc_id, path, content_hash, chunk_count) ordered by path for fingerprinting."""
+        rows = self.conn.execute(
+            """
+            SELECT d.id, d.path, COALESCE(d.content_hash, ''), COUNT(c.id) AS chunk_count
+            FROM documents d
+            LEFT JOIN chunks c ON c.doc_id = d.id
+            GROUP BY d.id
+            ORDER BY d.path ASC
+            """
+        ).fetchall()
+        return [(int(r[0]), str(r[1]), str(r[2]), int(r[3])) for r in rows]
+
+    def get_overview_source_data(
+        self,
+    ) -> Tuple[List[Tuple[int, str, str]], List[Tuple[int, int, str, Optional[bytes]]]]:
+        """
+        Loads all documents and chunks with their raw float32 vector blobs for overview building.
+        Returns (documents, chunks) where:
+          documents = [(doc_id, path, content_hash), ...]
+          chunks = [(chunk_id, doc_id, content, embedding_blob), ...]
+        """
+        docs = self.conn.execute(
+            "SELECT id, path, COALESCE(content_hash, '') FROM documents ORDER BY id ASC"
+        ).fetchall()
+        chunks = self.conn.execute(
+            """
+            SELECT c.id, c.doc_id, c.content, v.embedding
+            FROM chunks c
+            LEFT JOIN vec_chunks v ON v.rowid = c.id
+            ORDER BY c.id ASC
+            """
+        ).fetchall()
+        return (
+            [(int(r[0]), str(r[1]), str(r[2])) for r in docs],
+            [(int(r[0]), int(r[1]), str(r[2]), r[3]) for r in chunks],
+        )
+
+    def get_overview(self) -> Optional[Dict[str, Any]]:
+        """Returns the stored overview row and parsed JSON payload, or None if not present."""
+        row = self.conn.execute(
+            """
+            SELECT schema_version, model_name, built_at, source_fingerprint, payload
+            FROM overview
+            WHERE id = 1
+            """
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            payload = json.loads(row[4])
+        except Exception:
+            return None
+        return {
+            "schema_version": int(row[0]),
+            "model_name": str(row[1]),
+            "built_at": str(row[2]),
+            "source_fingerprint": str(row[3]),
+            "payload": payload,
+        }
+
+    def save_overview(
+        self,
+        schema_version: int,
+        model_name: str,
+        built_at: str,
+        source_fingerprint: str,
+        payload: Dict[str, Any] | str,
+    ) -> None:
+        """Persists the single overview row (id = 1)."""
+        payload_json = (
+            payload
+            if isinstance(payload, str)
+            else json.dumps(payload, ensure_ascii=False)
+        )
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO overview (
+                    id, schema_version, model_name, built_at, source_fingerprint, payload
+                ) VALUES (1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(schema_version),
+                    str(model_name),
+                    str(built_at),
+                    str(source_fingerprint),
+                    payload_json,
+                ),
+            )
 
 
 if __name__ == "__main__":
